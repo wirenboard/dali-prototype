@@ -137,7 +137,7 @@ function endScanner() {
 
 function sendCmd(cmd, data, callback) {
     dev["wb_dali_1/transmit_16_bit"] = (cmd << 8) + data;
-    setTimeout(callback, 50); // Wait for 50 ms
+    setTimeout(callback, 100); // Wait for 100 ms
 }
 
 function sendBright(cmd, data, callback) {
