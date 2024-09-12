@@ -1,4 +1,5 @@
 var deviceName = 'Dali_control';
+var daliGateName=dev["Dali_control/set_gateway_name"]
 var last_message;
 defineVirtualDevice(deviceName, {
     title: { 'en': 'Dali control', 'ru': 'Управление Дали' },
@@ -12,18 +13,17 @@ defineVirtualDevice(deviceName, {
             order: 0,
             readonly: false
         },
-        /*  Тестовый WB-REF-DALI имеет адресс 01
-        set_modbus_address: {
-            title: 'Set ModBus address, hex',
+        set_gateway_name: {
+            title: 'Set Inner Gateway Name',
             type: "text",
-            value: "01",
+            value: "wb-mdali_1",
             min: 1,
             max: 64,
             readonly: false,
             order: 1,
 
         },
-*/
+
         OFF_button: {
             title: 'Brightness 0%',
             type: "pushbutton",
@@ -140,6 +140,7 @@ defineVirtualDevice(deviceName, {
 
     }
 });
+daliGateName=dev["Dali_control/set_gateway_name"]
 defineRule("OFF_button_", {
     whenChanged: "Dali_control/OFF_button", // топик, при изменении которого сработает правило
     then: function (newValue, devName, cellName) {
@@ -147,7 +148,7 @@ defineRule("OFF_button_", {
 
         var message = (((dali_address << 1) + 1) << 8) + 0;
 
-        dev["wb_dali_1/transmit_16_bit"] = message;
+        dev[daliGateName+"/"+"channel1_transmit_16bit_forward"] = message;
 
     }
 });
@@ -158,7 +159,7 @@ defineRule("ON_button_", {
 
         var message = ((dali_address << 1) << 8) + 254;
 
-        dev["wb_dali_1/transmit_16_bit"] = message;
+        dev[daliGateName+"/"+"channel1_transmit_16bit_forward"] = message;
 
     }
 });
@@ -169,7 +170,7 @@ defineRule("Set_brightness_", {
 
         var message = ((dali_address << 1) << 8) + newValue;
 
-        dev["wb_dali_1/transmit_16_bit"] = message;
+        dev[daliGateName+"/"+"channel1_transmit_16bit_forward"]= message;
 
     }
 });
@@ -179,7 +180,7 @@ defineRule("Get_brightness_", {
         var dali_address = dev["Dali_control/set_dali_address"];
         var message = (((dali_address << 1) + 1) << 8) + 160;
         last_message = "QUERY LEVEL";
-        dev["wb_dali_1/transmit_16_bit"] = message;
+        dev[daliGateName+"/"+"channel1_transmit_16bit_forward"] = message;
 
     }
 });
@@ -189,12 +190,12 @@ defineRule("Get_status_", {
         var dali_address = dev["Dali_control/set_dali_address"];
         var message = (((dali_address << 1) + 1) << 8) + 144;
         last_message = "QUERY STATUS";
-        dev["wb_dali_1/transmit_16_bit"] = message;
+        dev[daliGateName+"/"+"channel1_transmit_16bit_forward"] = message;
 
     }
 });
 defineRule("Get_status_read", {
-    whenChanged: "wb_dali_1/recive_8_bit", // топик, при изменении которого сработает правило
+    whenChanged: daliGateName+"/"+"channel1_receive_8bit_backward", // топик, при изменении которого сработает правило
     then: function (newValue, devName, cellName) {
         if (last_message == "QUERY LEVEL") {
             dev["Dali_control/get_brightness"] = newValue;
@@ -226,7 +227,7 @@ defineRule("Get_status_read", {
 
 
 defineRule("Get_event_massage_", {
-    whenChanged: "wb_dali_1/recive_24_bit", // топик, при изменении которого сработает правило
+    whenChanged: daliGateName+"/"+"recive_24_bit", // топик, при изменении которого сработает правило
     then: function (newValue, devName, cellName) {
         var binaryString = newValue.toString(2);  //приходит 32бит с выравниванием по левому краю
         var binaryString24 = binaryString.slice(0, -8);// обрезаем 32 до 24 бит
@@ -260,7 +261,7 @@ defineRule("Get_event_massage_", {
             case "0000001110": eventText = "Button free"; break;
         }
         dev["Dali_control/read_panel_text"] = eventText;
-        dev["wb_dali_1/transmit_24_bit"] = 270532608
+        dev[daliGateName+"/"+"channel1_transmit_24bit_forward"] = 270532608
 
     }
 });
