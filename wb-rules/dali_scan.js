@@ -1,7 +1,15 @@
 var deviceName = 'Dali_scanner';
+var daliGateName = 'wb-mdali_1'; // Имя устройства
 var last_message;
+
+// Определяем переменные для пауз
+var initialPause = 530;         // Пауза перед первой последовательностью команд
+var betweenSequencesPause = 530; // Пауза перед началом сканирования
+var commandDelay = 60;          // Пауза между командами
+var uuidReadDelay = 300;        // Пауза перед чтением uuidFound
+
 defineVirtualDevice(deviceName, {
-    title: { 'en': 'Dali scaner', 'ru': 'Сканирование Дали' },
+    title: { 'en': 'Dali scanner', 'ru': 'Сканирование Дали' },
     cells: {
         buttonStartScanner: {
             title: 'buttonStartScanner',
@@ -24,114 +32,134 @@ defineVirtualDevice(deviceName, {
         }
     }
 });
+
 defineRule("buttonStartScanner", {
-    whenChanged: "Dali_scanner/buttonStartScanner", // топик, при изменении которого сработает правило
+    whenChanged: "Dali_scanner/buttonStartScanner",
     then: function (newValue, devName, cellName) {
-        scanner()
+        scanner();
     }
 });
 
-var high_byte
-var mid_byte
-var low_byte
+var high_byte, mid_byte, low_byte;
+
 function scanner() {
-    dev["Dali_scanner/status"] = "Run"
+    dev["Dali_scanner/status"] = "Run";
 
-    var short_add = 0
-    dev["Dali_scanner/count_found_device"] = short_add
-    var shot_list=[];
-    dev["Dali_scanner/list_of_short_address"] = "None"
-    low_longadd = 0x000000
-    high_longadd = 0xFFFFFF
-    sendCmd(0xA5, 0)
-    sendCmd(0xA5, 0)
-    sendCmd(0xA7, 0)
-    sendCmd(0xA7, 0)
-    longadd = ((low_longadd + high_longadd) / 2) | 0;
-    while ((longadd <= (0xFFFFFF - 2)) && short_add <= 64) {
-        while (high_longadd - low_longadd > 1) {
+    var short_add = 0;
+    dev["Dali_scanner/count_found_device"] = short_add;
+    var shot_list = [];
+    dev["Dali_scanner/list_of_short_address"] = "None";
+    var low_longadd = 0x000000;
+    var high_longadd = 0xFFFFFF;
 
-            high_byte, mid_byte, low_byte = split_24bit_number(longadd)
-            sendCmd(0xB1, high_byte)
-            sendCmd(0xB3, mid_byte)
-            sendCmd(0xB5, low_byte)            
-            sendCmd(0xA9, 0)
-            syncDelay(200)
-            var uuidFound;
-            uuidFound = dev["wb_dali_1/recive_on_compare"]
-            if (uuidFound == 1) {
-                high_longadd = longadd
-            }
-            else {
-                low_longadd = longadd
-            }
-            log.info("low_longadd--",low_longadd.toString(16),"--longadd: ", longadd.toString(16),"--high_longadd--",high_longadd.toString(16),"FOUND--",uuidFound)
+    // Первая последовательность команд с паузой commandDelay
+    executeCommandSequence([
+        { cmd: 0xA1, data: 0 },
+        { cmd: 0xA1, data: 0 }
+    ], commandDelay, function() {
+        setTimeout(function() {
+            // Вторая последовательность команд с паузой commandDelay
+            executeCommandSequence([
+                { cmd: 0xA5, data: 0 },
+                { cmd: 0xA5, data: 0 },
+                { cmd: 0xA7, data: 0 },
+                { cmd: 0xA7, data: 0 }
+            ], commandDelay, function() {
+                setTimeout(function() {
+                    // Начало сканирования после паузы betweenSequencesPause
+                    performScan(low_longadd, high_longadd, short_add, shot_list);
+                }, betweenSequencesPause);
+            });
+        }, initialPause);
+    });
+}
 
-            longadd = ((low_longadd + high_longadd) / 2) | 0;
+function performScan(low_longadd, high_longadd, short_add, shot_list) {
+    var longadd = ((low_longadd + high_longadd) / 2) | 0;
+
+    if ((longadd <= (0xFFFFFF - 2)) && short_add <= 64) {
+        if (high_longadd - low_longadd > 1) {
+            var splitResult = split_24bit_number(longadd);
+            high_byte = splitResult[0];
+            mid_byte = splitResult[1];
+            low_byte = splitResult[2];
+            executeCommandSequence([
+                { cmd: 0xB1, data: high_byte },
+                { cmd: 0xB3, data: mid_byte },
+                { cmd: 0xB5, data: low_byte },
+                { cmd: 0xA9, data: 0 }
+            ], commandDelay, function() {
+                // Пауза перед чтением uuidFound
+                setTimeout(function() {
+                    var uuidFound = dev[daliGateName + "/" + "channel1_bus_state_changed"];
+                    if (uuidFound == 1) {
+                        high_longadd = longadd;
+                    } else {
+                        low_longadd = longadd;
+                    }
+                    log.info("low_longadd--", low_longadd.toString(16), "--longadd: ", longadd.toString(16), "--high_longadd--", high_longadd.toString(16), "FOUND--", uuidFound);
+                    performScan(low_longadd, high_longadd, short_add, shot_list);
+                }, uuidReadDelay);
+            });
+        } else if (high_longadd != 0xFFFFFF) {
+            short_add++;
+            longadd++;
+            var splitResult = split_24bit_number(longadd);
+            high_byte = splitResult[0];
+            mid_byte = splitResult[1];
+            low_byte = splitResult[2];
+            executeCommandSequence([
+                { cmd: 0xB1, data: high_byte },
+                { cmd: 0xB3, data: mid_byte },
+                { cmd: 0xB5, data: low_byte },
+                { cmd: 0xB7, data: (short_add << 1) + 1 },
+                { cmd: 0xAB, data: 0 }
+            ], commandDelay, function() {
+                log.info(longadd.toString(16), "--PROGRAM SHORT ADDRESS=", short_add);
+                shot_list.push(short_add);
+                dev["Dali_scanner/list_of_short_address"] = shot_list.join(", ");
+                dev["Dali_scanner/count_found_device"] = short_add;
+                high_longadd = 0xFFFFFF;
+                performScan(low_longadd, high_longadd, short_add, shot_list);
+            });
+        } else {
+            log.info("END");
         }
-        if (high_longadd != 0xFFFFFF) {
-            short_add = short_add + 1
-            longadd = longadd + 1
-            high_byte, mid_byte, low_byte = split_24bit_number(longadd)
-            sendCmd(0xB1, high_byte)
-            sendCmd(0xB3, mid_byte)
-            sendCmd(0xB5, low_byte)
-            sendCmd(0xB7, (short_add << 1) + 1)
-            sendCmd(0xAB, 0)
+    } else {
+        log.info("END 2");
+        executeCommandSequence([
+            { cmd: 0xA1, data: 0 },
+            { cmd: 0xA1, data: 0 }
+        ], commandDelay, function() {
+            dev["Dali_scanner/status"] = "End";
+        });
+    }
+}
 
+function executeCommandSequence(commands, delay, callback) {
+    var currentCommandIndex = 0;
 
-            log.info(longadd.toString(16), "--PRORGAM SHORT ADDRESS=", short_add)
-
-
-            sendCmd(((short_add << 1) + 1), 0xC2)
-            sendCmd(((short_add << 1) + 1), 0xC3)
-            sendCmd(((short_add << 1) + 1), 0xC4)
-
-            sendBright(short_add, 0)
-            sendBright(short_add, 0xFE)
-            sendBright(short_add, 0)
-            shot_list.push(short_add);
-            dev["Dali_scanner/list_of_short_address"] =shot_list.join(", ")
-            dev["Dali_scanner/count_found_device"] = short_add
-            high_longadd = 0xFFFFFF
-            longadd = ((low_longadd + high_longadd) / 2) | 0;
-        }
-        else {
-            log.info("END")
+    function processNextCommand() {
+        if (currentCommandIndex < commands.length) {
+            var command = commands[currentCommandIndex];
+            sendCmd(command.cmd, command.data, delay, processNextCommand);
+            currentCommandIndex++;
+        } else if (callback) {
+            callback();
         }
     }
-    log.info("END 2")
 
-    sendCmd(0xA1, 0)
-    dev["Dali_scanner/status"] = "End"
-
+    processNextCommand();
 }
 
-function sendCmd(cmd, data) {
-    dev["wb_dali_1/transmit_16_bit"] = (cmd << 8) + data;
-    syncDelay(50)
+function sendCmd(cmd, data, delay, callback) {
+    dev[daliGateName + "/" + "channel1_transmit_16bit_forward"] = (cmd << 8) + data;
+    setTimeout(callback, delay);
+}
 
-}
-function sendBright(cmd, data) {
-    dev["wb_dali_1/transmit_16_bit"] = (((cmd << 1)) << 8) + data;
-    syncDelay(100)
-}
 function split_24bit_number(longadd) {
-    // Извлекаем старший байт (8 старших бит)
-    high_byte = (longadd >> 16) & 0xFF
-
-    // Извлекаем средний байт (средние 8 бит)
-    mid_byte = (longadd >> 8) & 0xFF
-
-    // Извлекаем младший байт (8 младших бит)
-    low_byte = longadd & 0xFF
-
-    return high_byte, mid_byte, low_byte
-}
-function syncDelay(milliseconds) {
-    var start = new Date().getTime();
-    var end = 0;
-    while ((end - start) < milliseconds) {
-        end = new Date().getTime();
-    }
+    var high_byte = (longadd >> 16) & 0xFF;
+    var mid_byte = (longadd >> 8) & 0xFF;
+    var low_byte = longadd & 0xFF;
+    return [high_byte, mid_byte, low_byte];
 }
