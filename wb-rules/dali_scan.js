@@ -5,8 +5,8 @@ var last_message;
 // Определяем переменные для пауз
 var initialPause = 530;         // Пауза перед первой последовательностью команд
 var betweenSequencesPause = 530; // Пауза перед началом сканирования
-var commandDelay = 60;          // Пауза между командами
-var uuidReadDelay = 300;        // Пауза перед чтением uuidFound
+var commandDelay = 70;          // Пауза между командами
+var uuidReadDelay = 500;        // Пауза перед чтением uuidFound
 
 defineVirtualDevice(deviceName, {
     title: { 'en': 'Dali scanner', 'ru': 'Сканирование Дали' },
