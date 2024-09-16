@@ -280,8 +280,7 @@ defineRule("Get_status_", {
 defineRule("Get_status_read", {
     whenChanged: daliGateName + "/" + daliGateChannel + "_receive_8bit_backward", // топик, при изменении которого сработает правило
     then: function (newValue, devName, cellName) {
-        log.info(last_message)
-        log.info(newValue)
+
         if (last_message == "QUERY LEVEL") {
             dev["Dali_control/get_brightness"] = newValue;
         }
