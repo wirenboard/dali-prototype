@@ -48,6 +48,24 @@ defineVirtualDevice(deviceName, {
             order: 3,
 
         },
+        read_UUID1: {
+            title: 'read_UUID_1',
+            type: "pushbutton",
+            order: 12,
+
+        },
+        read_UUID2: {
+            title: 'read_UUID_2',
+            type: "pushbutton",
+            order: 12,
+
+        },
+        read_UUID3: {
+            title: 'read_UUID_3',
+            type: "pushbutton",
+            order: 12,
+
+        },
         set_brightness: {
             title: 'Set brightness',
             type: "range",
@@ -185,6 +203,38 @@ defineRule("OFF_button_", {
 
     }
 });
+defineRule("read_UUID_1", {
+    whenChanged: "Dali_control/read_UUID1", // топик, при изменении которого сработает правило
+    then: function (newValue, devName, cellName) {
+        var dali_address = dev["Dali_control/set_dali_address"];
+
+        var message = (((dali_address << 1) + 1) << 8) + 0xC2;
+        dev[daliGateName + "/" + daliGateChannel + "_transmit_16bit_forward"] = message;
+
+
+
+    }
+});
+defineRule("read_UUID_2", {
+    whenChanged: "Dali_control/read_UUID2", // топик, при изменении которого сработает правило
+    then: function (newValue, devName, cellName) {
+        var dali_address = dev["Dali_control/set_dali_address"];
+
+        var message = (((dali_address << 1) + 1) << 8) + 0xC3;
+        dev[daliGateName + "/" + daliGateChannel + "_transmit_16bit_forward"] = message;
+
+
+    }
+});
+defineRule("read_UUID_3", {
+    whenChanged: "Dali_control/read_UUID3", // топик, при изменении которого сработает правило
+    then: function (newValue, devName, cellName) {
+        var dali_address = dev["Dali_control/set_dali_address"];
+        var message = (((dali_address << 1) + 1) << 8) + 0xC4;
+        dev[daliGateName + "/" + daliGateChannel + "_transmit_16bit_forward"] = message;
+
+    }
+});
 defineRule("ON_button_", {
     whenChanged: "Dali_control/ON_button", // топик, при изменении которого сработает правило
     then: function (newValue, devName, cellName) {
@@ -254,7 +304,7 @@ defineRule("Get_status_read", {
             dev["Dali_control/status_power_failure"] = binaryString[0] === '1';
         }
         //dev[daliGateName + "/" + daliGateChannel + "_receive_8bit_backward"] = 0;
-
+        last_message ="";
     }
 
 }
